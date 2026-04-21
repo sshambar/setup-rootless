@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# Copyright (C) 2025 Scott Shambarger v0.2.0
+# Copyright (C) 2025-26 Scott Shambarger v0.2.1
 #
 # TODO:
 #   SR_INTF: support patterns
@@ -143,6 +143,7 @@ setup_gw() { # "<gateway>/<mask>"...
     sudo ip -n "$SR_NS" link set "${SR_INTF}-peer" name "$SR_INTF" netns "$lns"
   }
 
+  echo "Setting link+peer $SR_INTF up"
   sudo ip link set "$SR_INTF" up
   podman unshare --rootless-netns ip link set "$SR_INTF" up
 
@@ -174,7 +175,7 @@ setup_gw() { # "<gateway>/<mask>"...
 	  jq -r '.[]|select(.dst=="default").gateway' |
 	  grep -q "$gw" && exit
 	echo "Adding default route via $gw dev $SR_INTF to rootless"
-	ip route add default via "$gw" dev "$SR_INTF"
+	ip route add default via "$gw" dev "$SR_INTF" metric 500
 	EOF
   done
 
