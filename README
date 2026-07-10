@@ -3,10 +3,11 @@ Script to create publically routable rootless podman networks
 
 Usage:
   Setup public routing for podman network <name>
-  Usage: setup-rootless [ -r ] <name> | -x | -h
+  Usage: setup-rootless [ -r ] <name> | -h | -n <cmd> ...
   Options:
    -h - show help
    -r - remove (all if no <name>)
+   -n <cmd> - run <cmd> in rootless-netns
 
 Example:
 
@@ -37,6 +38,11 @@ Creates host interface $SR_INTF and routes for subnets in named podman
 networks.  If $SR_NET exists, it is used to determine single vs
 dual-stack networking (default: dual).  $SR_NET also determines the host
 addresses for $SR_INTF and nexthop addresses for added routes.
+
+In addition, private subnet routes (192.168.0.0/16, 172.16.0.0/12,
+10.0.0.0/8, and fd00::/8) are added to the rootless-netns with
+the host-side $SR_INTF ip as gateway (so private network traffic is routed
+back to the host).
 
 Theory:
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# Copyright (C) 2025-26 Scott Shambarger v0.2.1
+# Copyright (C) Scott Shambarger v0.4.0
 #
 # TODO:
 #   SR_INTF: support patterns
@@ -85,6 +85,17 @@ modify_ip() { # <ip> <quad>
   else
     echo "${1%.*}.$2/${1#*/}"
   fi
+}
+
+add_gw_route() { # -4|-6 <subnet> <gw>
+  local arg=$1 sn=$2 gw=$3
+  podman unshare --rootless-netns <<- EOF
+	ip "$arg" -j route show dev "$SR_INTF" |
+	  jq -r '.[]|select(.dst=="$sn").gateway' |
+	  grep -q "$gw" && exit
+	echo "Adding route $sn via $gw dev $SR_INTF to rootless"
+	ip route add "$sn" via "$gw" dev "$SR_INTF"
+	EOF
 }
 
 setup_gw() { # "<gateway>/<mask>"...
@@ -177,6 +188,14 @@ setup_gw() { # "<gateway>/<mask>"...
 	echo "Adding default route via $gw dev $SR_INTF to rootless"
 	ip route add default via "$gw" dev "$SR_INTF" metric 500
 	EOF
+
+    if [[ $gw =~ : ]]; then
+      add_gw_route -6 fd00::/8 "$gw"
+    else
+      add_gw_route -4 192.168.0.0/16 "$gw"
+      add_gw_route -4 172.16.0.0/12 "$gw"
+      add_gw_route -4 10.0.0.0/8 "$gw"
+    fi
   done
 
   # podman adds 169.254.1.1 to resolv.conf, so direct it to pasta
@@ -288,10 +307,11 @@ rm_links() { # <names>...
 
 usage() {
   echo "Setup public routing for podman network <name>"
-  echo "Usage: ${0##*/} [ -r ] <name> | -x | -h"
+  echo "Usage: ${0##*/} [ -r ] <name> | -h | -n <cmd> ..."
   echo "Options:"
   echo " -h - show help"
   echo " -r - remove (all if no <name>)"
+  echo " -n <cmd> - run <cmd> in rootless-netns"
 }
 
 REMOVE=
@@ -299,6 +319,12 @@ while [[ $1 ]]; do
   case $1 in
     -r) REMOVE=1;;
     -h|--help) usage; exit;;
+    -n) shift
+        [[ $1 ]] || { usage; exit 1; }
+        # remaining args are all for <cmd>
+        podman unshare --rootless-netns "$@"
+        exit
+        ;;
     -*) err "Option $1 unknown"; usage; exit 1;;
     *) break;;
   esac
