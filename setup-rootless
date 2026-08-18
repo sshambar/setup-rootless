@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# Copyright (C) Scott Shambarger v0.4.0
+# Copyright (C) Scott Shambarger v0.5.0
 #
 # TODO:
 #   SR_INTF: support patterns
@@ -99,7 +99,7 @@ add_gw_route() { # -4|-6 <subnet> <gw>
 }
 
 setup_gw() { # "<gateway>/<mask>"...
-  local ip pid lns gw args=()
+  local ip pid gw args=()
 
   podman &>/dev/null inspect "$SR_INFRA" || {
     echo "Creating pod $SR_INFRA to hold rootless netns"
