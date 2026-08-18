@@ -148,10 +148,8 @@ setup_gw() { # "<gateway>/<mask>"...
     ip &>/dev/null link show "$SR_INTF" &&
       die "Host link $SR_INTF used by something other an rootless link $SR_INTF"
 
-    lns=$(ip netns identify $$)
-    [[ $lns ]] || die "Unable to discover name of default network namespace"
     echo "Moving $SR_INTF peer to host"
-    sudo ip -n "$SR_NS" link set "${SR_INTF}-peer" name "$SR_INTF" netns "$lns"
+    sudo ip -n "$SR_NS" link set "${SR_INTF}-peer" name "$SR_INTF" netns $$
   }
 
   echo "Setting link+peer $SR_INTF up"
