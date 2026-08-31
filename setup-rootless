@@ -156,6 +156,16 @@ setup_gw() { # "<gateway>/<mask>"...
   sudo ip link set "$SR_INTF" up
   podman unshare --rootless-netns ip link set "$SR_INTF" up
 
+  # nfmarks are stripped when packets cross a netns boundary, so the Netavark
+  # mark (0x00040000) used by the host masquerade rule is lost on arrival via
+  # $SR_INTF.  Re-apply it in PREROUTING and ensure a masquerade rule exists.
+  for ipt in iptables ip6tables; do
+    sudo $ipt -t mangle -C PREROUTING -i "$SR_INTF" -j MARK --set-mark 0x00040000/0x00ff0000 2>/dev/null ||
+      sudo $ipt -t mangle -A PREROUTING -i "$SR_INTF" -j MARK --set-mark 0x00040000/0x00ff0000
+    sudo $ipt -t nat -C POSTROUTING -m mark --mark 0x00040000/0x00ff0000 -j MASQUERADE 2>/dev/null ||
+      sudo $ipt -t nat -A POSTROUTING -m mark --mark 0x00040000/0x00ff0000 -j MASQUERADE
+  done
+
   for gw in "$@"; do
     ip -j addr show dev "$SR_INTF" |
       jq -r '.[0].addr_info[]|select(.scope=="global")|.local+"/"+(.prefixlen|tostring)' |
@@ -282,6 +292,10 @@ rm_links() { # <names>...
   ip &>/dev/null link show "$SR_INTF" && {
     echo "Removing rootless link $SR_INTF"
     podman unshare --rootless-netns ip 2>/dev/null link del "$SR_INTF"
+    for ipt in iptables ip6tables; do
+      sudo $ipt -t mangle -D PREROUTING -i "$SR_INTF" -j MARK --set-mark 0x00040000/0x00ff0000 2>/dev/null || :
+      sudo $ipt -t nat -D POSTROUTING -m mark --mark 0x00040000/0x00ff0000 -j MASQUERADE 2>/dev/null || :
+    done
   }
 
   podman &>/dev/null pod inspect "$SR_INFRA" && {
